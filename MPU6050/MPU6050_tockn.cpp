@@ -61,7 +61,7 @@ void MPU6050::calcGyroOffsets(bool console, uint16_t delayBefore, uint16_t delay
     Serial.print("DO NOT MOVE MPU6050");
   }
 
-  /*This for loop iterates 3000 times to get an average value for the gyro offsets */
+/*This for loop iterates 3000 times to get an average value for the gyro offsets */
   for(int i = 0; i < 3000; i++){   
     if(console && i % 1000 == 0){
       Serial.print(".");
@@ -75,18 +75,19 @@ void MPU6050::calcGyroOffsets(bool console, uint16_t delayBefore, uint16_t delay
     ry = wire->read() << 8 | wire->read(); //Grabs raw data from gyro 
     rz = wire->read() << 8 | wire->read(); //Grabs raw data from gyro 
 
-	/* This converts raw data into degrees/s (angulate rate). I chose a reading rate of 500 degrees/s which has an associated sensitivity factor of 65.5 (LSB)(degrees/s). 
-	Dividing the raw data by the sensitivity factor will give you the agular rate (degrees/s). The reading rate and sensitivity factor values are found in the mpu6050 datasheet on page 12.*/
+/* This converts raw data into degrees/s (angulate rate). I chose a reading rate of 500 degrees/s which has an associated sensitivity 
+factor of 65.5 (LSB)(degrees/s). Dividing the raw data by the sensitivity factor will give you the agular rate (degrees/s).
+The reading rate and sensitivity factor values are found in the mpu6050 datasheet on page 12.*/
     x += ((float)rx) / 65.5;  // The angles are added up to be divided for the average value in the next step
     y += ((float)ry) / 65.5;
     z += ((float)rz) / 65.5;
   }
-  /* The sum of the angles are divided by the total number of readings (3000) to get the average gyroOffset*/
+/* The sum of the angles are divided by the total number of readings (3000) to get the average gyroOffset*/
   gyroXoffset = x / 3000;  
   gyroYoffset = y / 3000;
   gyroZoffset = z / 3000;
 
-  /* This step prints the Offsets to the serial monitor and starts the program */
+/* This step prints the Offsets to the serial monitor and starts the program */
   if(console){
     Serial.println();
     Serial.println("Done!");
@@ -114,16 +115,19 @@ void MPU6050::update(){
   rawGyroY = wire->read() << 8 | wire->read();
   rawGyroZ = wire->read() << 8 | wire->read();
 
-  /* The MPU6050 also has a temp sensor */
-  temp = (rawTemp + 12412.0) / 340.0; // I Have no idea why 12412 is added to the raw data (Bit correction?) but the raw data is then divided by the sensitivity factor 340 (LSB)degrees/C to get the temp in Celcius
+/* The MPU6050 also has a temp sensor. I Have no idea why 12412 is added to the raw data (Bit correction?) 
+but the raw data is then divided by the sensitivity factor 340 (LSB)degrees/C to get the temp in Celcius*/
+  temp = (rawTemp + 12412.0) / 340.0; 
 
-  /* This converts raw data into g's (m/s^2). I chose a sensitivity of +-2g's which has an associated sensitivity factor of 16384 LSB/g.
-	Dividing the raw data by the sensitivity factor will give you the g value for that axis. The sensitivity and sensitivity factor values are found in the mpu6050 datasheet on page 13.*/
+/* This converts raw data into g's (m/s^2). I chose a sensitivity of +-2g's which has an associated sensitivity factor of 16384 LSB/g.
+Dividing the raw data by the sensitivity factor will give you the g value for that axis. The sensitivity and sensitivity factor values
+are found in the mpu6050 datasheet on page 13.*/
   accX = ((float)rawAccX) / 16384.0;
   accY = ((float)rawAccY) / 16384.0;
   accZ = ((float)rawAccZ) / 16384.0;
 
- // The angle from the accelerometer can be calulated using trig in combination with an atan2 function. These equations are derived in equations 37 and 28 in "https://www.nxp.com/files-static/sensors/doc/app_note/AN3461.pdf" 
+/* The angle from the accelerometer can be calulated using trig in combination with an atan2 function. These equations are 
+derived in equations 37 and 28 in "https://www.nxp.com/files-static/sensors/doc/app_note/AN3461.pdf" */
   angleAccX = atan2(accY, accZ + abs(accX)) * 360 / 2.0 / PI;  // 360/2/PI just converts from radians to degrees
   angleAccY = atan2(accX, accZ + abs(accY)) * 360 / -2.0 / PI;
 
@@ -137,16 +141,22 @@ void MPU6050::update(){
   gyroY -= gyroYoffset;
   gyroZ -= gyroZoffset;
 
-  interval = (millis() - preInterval) * 0.001; // This step calulates the interval (dt) for the next step. Basically dt is the time it takes for one iteration/calualtion of the main loop
+/*  This step calulates the interval (dt) for the next step. Basically dt is the time it takes for one iteration/calualtion of the main
+    loop */
+  interval = (millis() - preInterval) * 0.001; 
 
-  // Angular rate is degrees/s so by multiplying the agular rate by the time it took to caluate will result in just the angle. (degrees/s)*s = degrees
+/* Angular rate is degrees/s so by multiplying the agular rate by the time it took to caluate will result in just the angle.
+  (degrees/s)*s = degrees*/ 
   angleGyroX += gyroX * interval; 
   angleGyroY += gyroY * interval;
   angleGyroZ += gyroZ * interval;
 
-  /* Both an accelrometer and gyroscope have their cons so a filter needs to be applied to aquire a more accurate reading. An accelerometer is great at calculating angles as long as the sensor is not being accelerated and a gryscope 
-  has error due to integration (roundoff error) which is known as "drift". Combining data from both sensors through a filter will significantly increase accuracy. The following filter is a comlimentary filter and relies heavily on the
-  gryroscope (98% of the final value) but is made more true with the combination of the accelerometer (2% of the final value). I uploaded a graph I made in the drive that shows the benefit of having a filter vs not having one. */
+  /* Both an accelrometer and gyroscope have their cons so a filter needs to be applied to aquire a more accurate reading. 
+  An accelerometer is great at calculating angles as long as the sensor is not being accelerated and a gryscope has error due to 
+  integration (roundoff error) which is known as "drift". Combining data from both sensors through a filter will significantly increase
+  accuracy. The following filter is a comlimentary filter and relies heavily on the gryroscope (98% of the final value) but is made 
+  more true with the combination of the accelerometer (2% of the final value). I uploaded a graph I made in the drive that shows the 
+  benefit of having a filter vs not having one. */
   angleX = (gyroCoef * (angleX + gyroX * interval)) + (accCoef * angleAccX);
   angleY = (gyroCoef * (angleY + gyroY * interval)) + (accCoef * angleAccY);
   angleZ = angleGyroZ;
